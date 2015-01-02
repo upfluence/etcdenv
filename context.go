@@ -64,7 +64,9 @@ func (ctx *Context) fetchEnvVariables() map[string]string {
 	result := make(map[string]string)
 
 	for _, node := range response.Node.Nodes {
-		result[strings.TrimPrefix(node.Key, flags.Namespace)] = node.Value
+    key := strings.TrimPrefix(node.Key, flags.Namespace)
+    key = strings.TrimPrefix(key, "/")
+    result[key] = node.Value
 	}
 
 	return result
