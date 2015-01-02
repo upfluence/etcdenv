@@ -34,7 +34,7 @@ var (
 )
 
 func usage() {
-  fmt.Fprintf(os.Stderr, `
+	fmt.Fprintf(os.Stderr, `
   NAME
   etcdenv - use your etcd keys as environment variables
 
@@ -43,7 +43,7 @@ func usage() {
 
   OPTIONS
   `)
-  flagset.PrintDefaults()
+	flagset.PrintDefaults()
 }
 
 func init() {
@@ -62,12 +62,12 @@ func init() {
 
 func main() {
 	flagset.Parse(os.Args[1:])
-  flagset.Usage = usage
+	flagset.Usage = usage
 
-  if len(os.Args) < 2 {
-    flagset.Usage()
-    os.Exit(0)
-  }
+	if len(os.Args) < 2 {
+		flagset.Usage()
+		os.Exit(0)
+	}
 
 	if flags.Version {
 		fmt.Printf("etcdenv v.%s", currentVersion)
