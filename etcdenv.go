@@ -16,8 +16,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/coreos/go-etcd/etcd"
-	"log"
+	"github.com/upfluence/etcdenv/etcdenv"
 	"os"
 	"os/signal"
 )
@@ -76,13 +75,10 @@ func main() {
 		os.Exit(0)
 	}
 
-	logger := log.New(os.Stdout, "etcd", log.LstdFlags)
-	etcd.SetLogger(logger)
-
 	signalChan := make(chan os.Signal)
 	signal.Notify(signalChan, os.Interrupt, os.Kill)
 
-	ctx := NewContext(
+	ctx := etcdenv.NewContext(
 		flags.Namespace,
 		[]string{flags.Server},
 		flagset.Args(),
