@@ -25,36 +25,24 @@ import (
 
 type Context struct {
 	Namespace       string
-	Command         []string
+	Runner          *Runner
 	ExitChan        chan bool
 	RestartOnChange bool
 
-	etcdClient     *etcd.Client
-	currentEnviron []string
+	etcdClient *etcd.Client
 }
 
 func NewContext(namespace string, endpoints, command []string, restart bool) *Context {
 	return &Context{
 		Namespace:       namespace,
-		Command:         command,
+		Runner:          NewRunner(command),
 		etcdClient:      etcd.NewClient(endpoints),
-		currentEnviron:  os.Environ(),
 		RestartOnChange: restart,
 		ExitChan:        make(chan bool),
 	}
 }
 
-func (ctx *Context) getEnvs() []string {
-	result := ctx.currentEnviron
-
-	for k, v := range ctx.fetchEnvVariables() {
-		result = append(result, fmt.Sprintf("%s=%s", k, v))
-	}
-
-	return result
-}
-
-func (ctx *Context) fetchEnvVariables() map[string]string {
+func (ctx *Context) fetchEtcdVariables() map[string]string {
 	response, err := ctx.etcdClient.Get(flags.Namespace, false, false)
 
 	if err != nil {
@@ -64,45 +52,38 @@ func (ctx *Context) fetchEnvVariables() map[string]string {
 	result := make(map[string]string)
 
 	for _, node := range response.Node.Nodes {
-    key := strings.TrimPrefix(node.Key, flags.Namespace)
-    key = strings.TrimPrefix(key, "/")
-    result[key] = node.Value
+		key := strings.TrimPrefix(node.Key, flags.Namespace)
+		key = strings.TrimPrefix(key, "/")
+		result[key] = node.Value
 	}
 
 	return result
 }
 
-func (ctx *Context) runCommand() *exec.Cmd {
-	cmd := exec.Command(ctx.Command[0], ctx.Command[1:]...)
-
-	cmd.Env = ctx.getEnvs()
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-
-	go cmd.Run()
-
-	return cmd
-}
-
 func (ctx *Context) Run() {
-	cmd := ctx.runCommand()
+	ctx.Runner.Start(ctx.fetchEtcdVariables())
 
 	if ctx.RestartOnChange {
 		responseChan := make(chan *etcd.Response)
 
-		go ctx.etcdClient.Watch(ctx.Namespace, 0, true, responseChan, ctx.ExitChan)
+		go func() {
+			for {
+				resp, err := ctx.etcdClient.Watch(ctx.Namespace, 0, true, nil, ctx.ExitChan)
+				if err != nil {
+					continue
+				}
+				responseChan <- resp
+			}
+		}()
 
 		for {
 			select {
 			case <-responseChan:
-				log.Println("Restarted")
+				log.Println("Process restarted")
 
-				cmd.Process.Kill()
-				cmd = ctx.runCommand()
-
+				ctx.Runner.Restart(ctx.fetchEtcdVariables())
 			case <-ctx.ExitChan:
-				cmd.Process.Kill()
+				ctx.Runner.Stop()
 			}
 		}
 
@@ -112,15 +93,13 @@ func (ctx *Context) Run() {
 		time.Sleep(200 * time.Millisecond)
 
 		go func() {
-			cmd.Process.Wait()
+			ctx.Runner.Wait()
 			processExitChan <- true
 		}()
 
 		select {
 		case <-ctx.ExitChan:
-			if cmd.Process != nil {
-				cmd.Process.Kill()
-			}
+			ctx.Runner.Stop()
 		case <-processExitChan:
 			ctx.ExitChan <- true
 		}

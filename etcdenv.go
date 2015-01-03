@@ -16,6 +16,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/coreos/go-etcd/etcd"
+	"log"
 	"os"
 	"os/signal"
 )
@@ -73,6 +75,9 @@ func main() {
 		fmt.Printf("etcdenv v.%s", currentVersion)
 		os.Exit(0)
 	}
+
+	logger := log.New(os.Stdout, "etcd", log.LstdFlags)
+	etcd.SetLogger(logger)
 
 	signalChan := make(chan os.Signal)
 	signal.Notify(signalChan, os.Interrupt, os.Kill)
