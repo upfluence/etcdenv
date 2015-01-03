@@ -14,11 +14,8 @@
 package main
 
 import (
-	"fmt"
 	"github.com/coreos/go-etcd/etcd"
 	"log"
-	"os"
-	"os/exec"
 	"strings"
 	"time"
 )
