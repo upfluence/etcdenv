@@ -8,6 +8,6 @@ git tag v$version
 GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build -o etcdenv-linux-amd64-$version .
 GOOS=darwin CGO_ENABLED=0 GOARCH=amd64 go build -o etcdenv-darwin-amd64-$version .
 
-hub release create --attach etcdenv-linux-amd64-$version etcdenv-darwin-amd64-$version $version
+hub release create -a etcdenv-linux-amd64-$version etcdenv-darwin-amd64-$version v$version
 
 rm etcdenv-*
