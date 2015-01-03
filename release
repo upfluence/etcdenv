@@ -1,6 +1,6 @@
 #!/bin/sh
 
-export GOPATH=`pwd`/Godeps/_workspace
+export GOPATH=`pwd`/Godeps/_workspace:$GOPATH
 version=$1
 
 git tag v$version
