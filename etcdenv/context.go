@@ -30,8 +30,7 @@ func NewContext(namespace string, endpoints, command []string, restart bool, wat
 
 func (ctx *Context) escapeNamespace(key string) string {
 	key = strings.TrimPrefix(key, ctx.Namespace)
-	key = strings.TrimPrefix(key, "/")
-	return key
+	return strings.TrimPrefix(key, "/")
 }
 
 func (ctx *Context) fetchEtcdVariables() map[string]string {
@@ -111,7 +110,6 @@ func containsString(keys []string, item string) bool {
 	for _, elt := range keys {
 		if elt == item {
 			return true
-			break
 		}
 	}
 
