@@ -35,7 +35,8 @@ GOPATH=`pwd`/Godeps/_workspace go build -o etcdenv .
 | ------ | ------- | ----------- |
 | `server`, `s` | http://127.0.0.1:4001 | Location of the etcd server |
 | `namespace`, `n`| /environments/production | Etcd directory where the environment variables are fetched |
-| `auto-restart`, `r` | true | Automaticly restart the command when a key watch change |
+| `auto-restart`, `r` | true | Automatically restart the command when a key watch change |
+| `watched`, `w` | `""` | A comma-separated list of environment variables triggering the command restart when they change |
 
 ### Command line
 
@@ -67,6 +68,20 @@ $ curl -XPOST -d "value=buz" http://127.0.0.1:4001/v2/keys/FOO
 2014/12/29 00:30:00 Restarted
 # ... your local environment variables
 FOO=buz
+```
+
+**To watch a set of keys only**
+
+```shell
+$ curl -XPOST -d "value=google.com" http://127.0.0.1:4001/v2/keys/GOOGLE_URL
+$ etcdenv -n / -w "FOO,GOOGLE_URL" printenv &
+# ... your local environment variables
+GOOGLE_URL=google.com
+$ curl -XPOST -d "value=foo" http://127.0.0.1:4001/v2/keys/BAR
+# ... the running command does not restart
+$ curl -XPOST -d "value=baz" http://127.0.0.1:4001/v2/keys/FOO
+# ... your local environment variables
+FOO=baz
 ```
 
 ## Contributing
