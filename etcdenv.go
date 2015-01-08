@@ -96,6 +96,7 @@ func main() {
 		[]string{flags.Server},
 		flagset.Args(),
 		flags.RestartOnChange,
+		watchedKeysList,
 	)
 
 	go ctx.Run()

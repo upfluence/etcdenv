@@ -12,17 +12,19 @@ type Context struct {
 	Runner          *Runner
 	ExitChan        chan bool
 	RestartOnChange bool
+	WatchedKeys     []string
 
 	etcdClient *etcd.Client
 }
 
-func NewContext(namespace string, endpoints, command []string, restart bool) *Context {
+func NewContext(namespace string, endpoints, command []string, restart bool, watchedKeys []string) *Context {
 	return &Context{
 		Namespace:       namespace,
 		Runner:          NewRunner(command),
 		etcdClient:      etcd.NewClient(endpoints),
 		RestartOnChange: restart,
 		ExitChan:        make(chan bool),
+		WatchedKeys:     watchedKeys,
 	}
 }
 
@@ -56,7 +58,9 @@ func (ctx *Context) Run() {
 				if err != nil {
 					continue
 				}
-				responseChan <- resp
+				if len(ctx.WatchedKeys) == 0 || containsString(ctx.WatchedKeys, strings.TrimPrefix(resp.Node.Key, "/")) {
+					responseChan <- resp
+				}
 			}
 		}()
 
@@ -64,7 +68,6 @@ func (ctx *Context) Run() {
 			select {
 			case <-responseChan:
 				log.Println("Process restarted")
-
 				ctx.Runner.Restart(ctx.fetchEtcdVariables())
 			case <-ctx.ExitChan:
 				ctx.Runner.Stop()
@@ -88,4 +91,16 @@ func (ctx *Context) Run() {
 			ctx.ExitChan <- true
 		}
 	}
+}
+
+func containsString(keys []string, item string) bool {
+	exists := false
+	for _, elt := range keys {
+		if elt == item {
+			exists = true
+			break
+		}
+	}
+
+	return exists
 }
