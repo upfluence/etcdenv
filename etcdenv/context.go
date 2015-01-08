@@ -28,6 +28,12 @@ func NewContext(namespace string, endpoints, command []string, restart bool, wat
 	}
 }
 
+func (ctx *Context) escapeNamespace(key string) string {
+	key = strings.TrimPrefix(key, ctx.Namespace)
+	key = strings.TrimPrefix(key, "/")
+	return key
+}
+
 func (ctx *Context) fetchEtcdVariables() map[string]string {
 	response, err := ctx.etcdClient.Get(ctx.Namespace, false, false)
 
@@ -38,8 +44,7 @@ func (ctx *Context) fetchEtcdVariables() map[string]string {
 	result := make(map[string]string)
 
 	for _, node := range response.Node.Nodes {
-		key := strings.TrimPrefix(node.Key, ctx.Namespace)
-		key = strings.TrimPrefix(key, "/")
+		key := ctx.escapeNamespace(node.Key)
 		result[key] = node.Value
 	}
 
@@ -47,13 +52,11 @@ func (ctx *Context) fetchEtcdVariables() map[string]string {
 }
 
 func (ctx *Context) shouldRestart(envVar string) bool {
-  shouldRestart := false
+	if len(ctx.WatchedKeys) == 0 || containsString(ctx.WatchedKeys, envVar) {
+		return true
+	}
 
-  if len(ctx.WatchedKeys) == 0 || containsString(ctx.WatchedKeys, envVar) {
-    shouldRestart = true
-  }
-
-  return shouldRestart
+	return false
 }
 
 func (ctx *Context) Run() {
@@ -69,7 +72,7 @@ func (ctx *Context) Run() {
 					continue
 				}
 
-				if ctx.shouldRestart(strings.TrimPrefix(resp.Node.Key, ctx.Namespace)) {
+				if ctx.shouldRestart(ctx.escapeNamespace(resp.Node.Key)) {
 					responseChan <- resp
 				}
 			}
@@ -105,13 +108,12 @@ func (ctx *Context) Run() {
 }
 
 func containsString(keys []string, item string) bool {
-	exists := false
 	for _, elt := range keys {
 		if elt == item {
-			exists = true
+			return true
 			break
 		}
 	}
 
-	return exists
+	return false
 }
