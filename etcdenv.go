@@ -19,6 +19,7 @@ import (
 	"github.com/upfluence/etcdenv/etcdenv"
 	"os"
 	"os/signal"
+	"strings"
 )
 
 const currentVersion = "0.0.1"
@@ -29,8 +30,9 @@ var (
 		Version         bool
 		RestartOnChange bool
 
-		Server    string
-		Namespace string
+		Server      string
+		Namespace   string
+		WatchedKeys string
 	}{}
 )
 
@@ -59,9 +61,14 @@ func init() {
 
 	flagset.StringVar(&flags.Namespace, "namespace", "/environments/production", "etcd directory where the environment variables are fetched")
 	flagset.StringVar(&flags.Namespace, "n", "/environments/production", "etcd directory where the environment variables are fetched")
+
+	flagset.StringVar(&flags.WatchedKeys, "watched", "", "environment variables to watch, comma-separated")
+	flagset.StringVar(&flags.WatchedKeys, "w", "", "environment variables to watch, comma-separated")
 }
 
 func main() {
+	var watchedKeysList []string
+
 	flagset.Parse(os.Args[1:])
 	flagset.Usage = usage
 
@@ -77,6 +84,12 @@ func main() {
 
 	signalChan := make(chan os.Signal)
 	signal.Notify(signalChan, os.Interrupt, os.Kill)
+
+	if flags.WatchedKeys == "" {
+		watchedKeysList = []string{}
+	} else {
+		watchedKeysList = strings.Split(flags.WatchedKeys, ",")
+	}
 
 	ctx := etcdenv.NewContext(
 		flags.Namespace,
