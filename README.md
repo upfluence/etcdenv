@@ -73,6 +73,5 @@ FOO=buz
 
 ### Roadmap
 
-* [ ] Add a flag to specify keys watched
 * [ ] If the namespace asked is not available only use current
   environments variables
