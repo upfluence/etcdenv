@@ -46,6 +46,16 @@ func (ctx *Context) fetchEtcdVariables() map[string]string {
 	return result
 }
 
+func (ctx *Context) shouldRestart(envVar string) bool {
+  shouldRestart := false
+
+  if len(ctx.WatchedKeys) == 0 || containsString(ctx.WatchedKeys, envVar) {
+    shouldRestart = true
+  }
+
+  return shouldRestart
+}
+
 func (ctx *Context) Run() {
 	ctx.Runner.Start(ctx.fetchEtcdVariables())
 
@@ -58,7 +68,8 @@ func (ctx *Context) Run() {
 				if err != nil {
 					continue
 				}
-				if len(ctx.WatchedKeys) == 0 || containsString(ctx.WatchedKeys, strings.TrimPrefix(resp.Node.Key, "/")) {
+
+				if ctx.shouldRestart(strings.TrimPrefix(resp.Node.Key, ctx.Namespace)) {
 					responseChan <- resp
 				}
 			}
