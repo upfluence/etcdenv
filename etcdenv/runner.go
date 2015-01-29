@@ -53,6 +53,8 @@ func (r *Runner) Stop() error {
 	}
 
 	r.cmd.Process.Kill()
+	r.cmd.Process.Wait()
+
 	r.cmd = nil
 
 	return nil
