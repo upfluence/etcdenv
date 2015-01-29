@@ -22,7 +22,7 @@ import (
 	"strings"
 )
 
-const currentVersion = "0.0.4"
+const currentVersion = "0.0.5"
 
 var (
 	flagset = flag.NewFlagSet("etcdenv", flag.ExitOnError)
