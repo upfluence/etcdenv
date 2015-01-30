@@ -78,7 +78,7 @@ func main() {
 	}
 
 	if flags.Version {
-		fmt.Printf("etcdenv v.%s", currentVersion)
+		fmt.Printf("etcdenv v%s", currentVersion)
 		os.Exit(0)
 	}
 
