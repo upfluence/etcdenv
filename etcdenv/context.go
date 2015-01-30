@@ -13,6 +13,7 @@ type Context struct {
 	ExitChan        chan bool
 	RestartOnChange bool
 	WatchedKeys     []string
+	CurrentEnv      map[string]string
 
 	etcdClient *etcd.Client
 }
@@ -25,6 +26,7 @@ func NewContext(namespace string, endpoints, command []string, restart bool, wat
 		RestartOnChange: restart,
 		ExitChan:        make(chan bool),
 		WatchedKeys:     watchedKeys,
+		CurrentEnv:      make(map[string]string),
 	}
 }
 
@@ -50,7 +52,11 @@ func (ctx *Context) fetchEtcdVariables() map[string]string {
 	return result
 }
 
-func (ctx *Context) shouldRestart(envVar string) bool {
+func (ctx *Context) shouldRestart(envVar, value string) bool {
+	if v, ok := ctx.CurrentEnv[envVar]; ok && v == value {
+		return false
+	}
+
 	if len(ctx.WatchedKeys) == 0 || containsString(ctx.WatchedKeys, envVar) {
 		return true
 	}
@@ -59,7 +65,8 @@ func (ctx *Context) shouldRestart(envVar string) bool {
 }
 
 func (ctx *Context) Run() {
-	ctx.Runner.Start(ctx.fetchEtcdVariables())
+	ctx.CurrentEnv = ctx.fetchEtcdVariables()
+	ctx.Runner.Start(ctx.CurrentEnv)
 
 	if ctx.RestartOnChange {
 		responseChan := make(chan *etcd.Response)
@@ -67,11 +74,14 @@ func (ctx *Context) Run() {
 		go func() {
 			for {
 				resp, err := ctx.etcdClient.Watch(ctx.Namespace, 0, true, nil, ctx.ExitChan)
+
 				if err != nil {
 					continue
 				}
 
-				if ctx.shouldRestart(ctx.escapeNamespace(resp.Node.Key)) {
+				log.Printf("%s key changed", resp.Node.Key)
+
+				if ctx.shouldRestart(ctx.escapeNamespace(resp.Node.Key), resp.Node.Value) {
 					responseChan <- resp
 				}
 			}
@@ -81,7 +91,8 @@ func (ctx *Context) Run() {
 			select {
 			case <-responseChan:
 				log.Println("Process restarted")
-				ctx.Runner.Restart(ctx.fetchEtcdVariables())
+				ctx.CurrentEnv = ctx.fetchEtcdVariables()
+				ctx.Runner.Restart(ctx.CurrentEnv)
 			case <-ctx.ExitChan:
 				ctx.Runner.Stop()
 			}
