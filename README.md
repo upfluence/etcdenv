@@ -86,7 +86,3 @@ FOO=baz
 
 ## Contributing
 
-### Roadmap
-
-* [ ] If the namespace asked is not available only use current
-  environments variables
