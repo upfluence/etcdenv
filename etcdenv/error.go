@@ -1,6 +1,7 @@
 package etcdenv
 
 const (
+	ErrKeyNotFound    = 100
 	ErrAlreadyStarted = iota
 	ErrNotStarted
 )

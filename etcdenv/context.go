@@ -42,6 +42,11 @@ func (ctx *Context) fetchEtcdVariables() map[string]string {
 	if err != nil {
 		if err.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
 			log.Println("Can't join the etcd server, fallback to the env variables")
+
+			return make(map[string]string)
+		} else if err.(*etcd.EtcdError).ErrorCode == ErrKeyNotFound {
+			log.Println("The namespace does not exist, fallback to the env variables")
+
 			return make(map[string]string)
 		} else {
 			panic(err.Error())
