@@ -39,7 +39,12 @@ func (ctx *Context) fetchEtcdVariables() map[string]string {
 	response, err := ctx.etcdClient.Get(ctx.Namespace, false, false)
 
 	if err != nil {
-		panic(err.Error())
+		if err.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
+			log.Println("Can't join the etcd server, fallback to the env variables")
+			return make(map[string]string)
+		} else {
+			panic(err.Error())
+		}
 	}
 
 	result := make(map[string]string)
