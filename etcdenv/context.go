@@ -1,6 +1,7 @@
 package etcdenv
 
 import (
+	"github.com/cenkalti/backoff"
 	"github.com/coreos/go-etcd/etcd"
 	"log"
 	"strings"
@@ -77,11 +78,26 @@ func (ctx *Context) Run() {
 		responseChan := make(chan *etcd.Response)
 
 		go func() {
+			var t time.Duration
+			b := backoff.NewExponentialBackOff()
+			b.Reset()
+
 			for {
 				resp, err := ctx.etcdClient.Watch(ctx.Namespace, 0, true, nil, ctx.ExitChan)
 
 				if err != nil {
-					continue
+
+					if err.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
+						t = b.NextBackOff()
+						log.Printf("Can't join the etcd server, wait %v", t)
+						time.Sleep(t)
+					}
+
+					if t == backoff.Stop {
+						return
+					} else {
+						continue
+					}
 				}
 
 				log.Printf("%s key changed", resp.Node.Key)
