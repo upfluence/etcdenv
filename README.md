@@ -2,7 +2,7 @@
 
 Etcdenv provide a convenient way to populate environments variables from one your etcd directory
 
-## Instalation
+## Installation
 
 Easy! You can just download the binary from the command line:
 
