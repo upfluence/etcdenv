@@ -4,6 +4,7 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/coreos/go-etcd/etcd"
 	"log"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -40,6 +41,13 @@ func (ctx *Context) fetchEtcdVariables() map[string]string {
 	response, err := ctx.etcdClient.Get(ctx.Namespace, false, false)
 
 	if err != nil {
+		etcdErrorType := reflect.TypeOf(&etcd.EtcdError{})
+		log.Println(err.Error())
+
+		if !reflect.TypeOf(err).ConvertibleTo(etcdErrorType) {
+			panic(err.Error())
+		}
+
 		if err.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
 			log.Println("Can't join the etcd server, fallback to the env variables")
 
@@ -76,6 +84,7 @@ func (ctx *Context) shouldRestart(envVar, value string) bool {
 }
 
 func (ctx *Context) Run() {
+	etcdErrorType := reflect.TypeOf(&etcd.EtcdError{})
 	ctx.CurrentEnv = ctx.fetchEtcdVariables()
 	ctx.Runner.Start(ctx.CurrentEnv)
 
@@ -91,6 +100,11 @@ func (ctx *Context) Run() {
 				resp, err := ctx.etcdClient.Watch(ctx.Namespace, 0, true, nil, ctx.ExitChan)
 
 				if err != nil {
+					log.Println(err.Error())
+
+					if !reflect.TypeOf(err).ConvertibleTo(etcdErrorType) {
+						continue
+					}
 
 					if err.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
 						t = b.NextBackOff()
