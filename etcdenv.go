@@ -91,7 +91,7 @@ func main() {
 	}
 
 	ctx := etcdenv.NewContext(
-		flags.Namespace,
+		strings.Split(flags.Namespace, ","),
 		[]string{flags.Server},
 		flagset.Args(),
 		!flags.RestartOnChange,
