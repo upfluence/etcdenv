@@ -35,7 +35,7 @@ GOPATH=`pwd`/Godeps/_workspace go build -o etcdenv .
 | ------ | ------- | ----------- |
 | `server`, `s` | http://127.0.0.1:4001 | Location of the etcd server |
 | `namespace`, `n`| /environments/production | Etcd directory where the environment variables are fetched |
-| `auto-restart`, `r` | true | Automatically restart the command when a key watch change |
+| `r` | false | Not restart the command when a key watch change |
 | `watched`, `w` | `""` | A comma-separated list of environment variables triggering the command restart when they change |
 
 ### Command line
