@@ -10,7 +10,7 @@ import (
 )
 
 type Context struct {
-	Namespace       string
+	Namespaces      []string
 	Runner          *Runner
 	ExitChan        chan bool
 	RestartOnChange bool
@@ -20,9 +20,9 @@ type Context struct {
 	etcdClient *etcd.Client
 }
 
-func NewContext(namespace string, endpoints, command []string, restart bool, watchedKeys []string) *Context {
+func NewContext(namespaces []string, endpoints, command []string, restart bool, watchedKeys []string) *Context {
 	return &Context{
-		Namespace:       namespace,
+		Namespaces:      namespaces,
 		Runner:          NewRunner(command),
 		etcdClient:      etcd.NewClient(endpoints),
 		RestartOnChange: restart,
@@ -33,39 +33,49 @@ func NewContext(namespace string, endpoints, command []string, restart bool, wat
 }
 
 func (ctx *Context) escapeNamespace(key string) string {
-	key = strings.TrimPrefix(key, ctx.Namespace)
+	for _, namespace := range ctx.Namespaces {
+		if strings.HasPrefix(key, namespace) {
+			key = strings.TrimPrefix(key, namespace)
+			break
+		}
+	}
+
 	return strings.TrimPrefix(key, "/")
 }
 
 func (ctx *Context) fetchEtcdVariables() map[string]string {
-	response, err := ctx.etcdClient.Get(ctx.Namespace, false, false)
-
-	if err != nil {
-		etcdErrorType := reflect.TypeOf(&etcd.EtcdError{})
-		log.Println(err.Error())
-
-		if !reflect.TypeOf(err).ConvertibleTo(etcdErrorType) {
-			panic(err.Error())
-		}
-
-		if err.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
-			log.Println("Can't join the etcd server, fallback to the env variables")
-
-			return make(map[string]string)
-		} else if err.(*etcd.EtcdError).ErrorCode == ErrKeyNotFound {
-			log.Println("The namespace does not exist, fallback to the env variables")
-
-			return make(map[string]string)
-		} else {
-			panic(err.Error())
-		}
-	}
-
 	result := make(map[string]string)
 
-	for _, node := range response.Node.Nodes {
-		key := ctx.escapeNamespace(node.Key)
-		result[key] = node.Value
+	for _, namespace := range ctx.Namespaces {
+		response, err := ctx.etcdClient.Get(namespace, false, false)
+
+		if err != nil {
+			etcdErrorType := reflect.TypeOf(&etcd.EtcdError{})
+			log.Println(err.Error())
+
+			if !reflect.TypeOf(err).ConvertibleTo(etcdErrorType) {
+				panic(err.Error())
+			}
+
+			if err.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
+				log.Println("Can't join the etcd server, fallback to the env variables")
+
+				break
+			} else if err.(*etcd.EtcdError).ErrorCode == ErrKeyNotFound {
+				log.Println("The namespace does not exist, fallback to the env variables")
+
+				break
+			} else {
+				panic(err.Error())
+			}
+		}
+
+		for _, node := range response.Node.Nodes {
+			key := ctx.escapeNamespace(node.Key)
+			if _, ok := result[key]; !ok {
+				result[key] = node.Value
+			}
+		}
 	}
 
 	return result
@@ -91,41 +101,43 @@ func (ctx *Context) Run() {
 	if ctx.RestartOnChange {
 		responseChan := make(chan *etcd.Response)
 
-		go func() {
-			var t time.Duration
-			b := backoff.NewExponentialBackOff()
-			b.Reset()
+		for _, namespace := range ctx.Namespaces {
+			go func() {
+				var t time.Duration
+				b := backoff.NewExponentialBackOff()
+				b.Reset()
 
-			for {
-				resp, err := ctx.etcdClient.Watch(ctx.Namespace, 0, true, nil, ctx.ExitChan)
+				for {
+					resp, err := ctx.etcdClient.Watch(namespace, 0, true, nil, ctx.ExitChan)
 
-				if err != nil {
-					log.Println(err.Error())
+					if err != nil {
+						log.Println(err.Error())
 
-					if !reflect.TypeOf(err).ConvertibleTo(etcdErrorType) {
-						continue
+						if !reflect.TypeOf(err).ConvertibleTo(etcdErrorType) {
+							continue
+						}
+
+						if err.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
+							t = b.NextBackOff()
+							log.Printf("Can't join the etcd server, wait %v", t)
+							time.Sleep(t)
+						}
+
+						if t == backoff.Stop {
+							return
+						} else {
+							continue
+						}
 					}
 
-					if err.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
-						t = b.NextBackOff()
-						log.Printf("Can't join the etcd server, wait %v", t)
-						time.Sleep(t)
-					}
+					log.Printf("%s key changed", resp.Node.Key)
 
-					if t == backoff.Stop {
-						return
-					} else {
-						continue
+					if ctx.shouldRestart(ctx.escapeNamespace(resp.Node.Key), resp.Node.Value) {
+						responseChan <- resp
 					}
 				}
-
-				log.Printf("%s key changed", resp.Node.Key)
-
-				if ctx.shouldRestart(ctx.escapeNamespace(resp.Node.Key), resp.Node.Value) {
-					responseChan <- resp
-				}
-			}
-		}()
+			}()
+		}
 
 		for {
 			select {
