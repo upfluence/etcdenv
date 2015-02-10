@@ -53,8 +53,7 @@ func init() {
 	flagset.BoolVar(&flags.Version, "version", false, "Print the version and exit")
 	flagset.BoolVar(&flags.Version, "v", false, "Print the version and exit")
 
-	flagset.BoolVar(&flags.RestartOnChange, "auto-restart", true, "Automaticly restart the command when a value change")
-	flagset.BoolVar(&flags.RestartOnChange, "r", true, "Automaticly restart the command when a value change")
+	flagset.BoolVar(&flags.RestartOnChange, "r", false, "Not restart the command when a value change")
 
 	flagset.StringVar(&flags.Server, "server", "http://127.0.0.1:4001", "Location of the etcd server")
 	flagset.StringVar(&flags.Server, "s", "http://127.0.0.1:4001", "Location of the etcd server")
@@ -95,7 +94,7 @@ func main() {
 		flags.Namespace,
 		[]string{flags.Server},
 		flagset.Args(),
-		flags.RestartOnChange,
+		!flags.RestartOnChange,
 		watchedKeysList,
 	)
 
