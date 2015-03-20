@@ -16,8 +16,8 @@ type Context struct {
 	RestartOnChange bool
 	WatchedKeys     []string
 	CurrentEnv      map[string]string
-
-	etcdClient *etcd.Client
+	maxRetry        int
+	etcdClient      *etcd.Client
 }
 
 func NewContext(namespaces []string, endpoints, command []string, restart bool, watchedKeys []string) *Context {
@@ -29,6 +29,7 @@ func NewContext(namespaces []string, endpoints, command []string, restart bool, 
 		ExitChan:        make(chan bool),
 		WatchedKeys:     watchedKeys,
 		CurrentEnv:      make(map[string]string),
+		maxRetry:        3,
 	}
 }
 
@@ -43,37 +44,57 @@ func (ctx *Context) escapeNamespace(key string) string {
 	return strings.TrimPrefix(key, "/")
 }
 
+func (ctx *Context) fetchEtcdNamespaceVariables(namespace string, currentRetry int, b *backoff.ExponentialBackOff) map[string]string {
+	result := make(map[string]string)
+
+	response, err := ctx.etcdClient.Get(namespace, false, false)
+
+	if err != nil {
+		etcdErrorType := reflect.TypeOf(&etcd.EtcdError{})
+		log.Println(err.Error())
+
+		if !reflect.TypeOf(err).ConvertibleTo(etcdErrorType) {
+			panic(err.Error())
+		}
+
+		if err.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
+			log.Println("Can't join the etcd server, fallback to the env variables")
+		} else if err.(*etcd.EtcdError).ErrorCode == ErrKeyNotFound {
+			log.Println("The namespace does not exist, fallback to the env variables")
+		}
+
+		if currentRetry < ctx.maxRetry {
+			log.Println("retry fetching variables")
+			t := b.NextBackOff()
+			time.Sleep(t)
+			return ctx.fetchEtcdNamespaceVariables(namespace, currentRetry+1, b)
+		} else {
+			return result
+		}
+
+	}
+
+	for _, node := range response.Node.Nodes {
+		key := ctx.escapeNamespace(node.Key)
+		if _, ok := result[key]; !ok {
+			result[key] = node.Value
+		}
+	}
+
+	return result
+}
+
 func (ctx *Context) fetchEtcdVariables() map[string]string {
 	result := make(map[string]string)
 
+	b := backoff.NewExponentialBackOff()
+
 	for _, namespace := range ctx.Namespaces {
-		response, err := ctx.etcdClient.Get(namespace, false, false)
+		b.Reset()
 
-		if err != nil {
-			etcdErrorType := reflect.TypeOf(&etcd.EtcdError{})
-			log.Println(err.Error())
-
-			if !reflect.TypeOf(err).ConvertibleTo(etcdErrorType) {
-				panic(err.Error())
-			}
-
-			if err.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
-				log.Println("Can't join the etcd server, fallback to the env variables")
-
-				break
-			} else if err.(*etcd.EtcdError).ErrorCode == ErrKeyNotFound {
-				log.Println("The namespace does not exist, fallback to the env variables")
-
-				break
-			} else {
-				panic(err.Error())
-			}
-		}
-
-		for _, node := range response.Node.Nodes {
-			key := ctx.escapeNamespace(node.Key)
+		for key, value := range ctx.fetchEtcdNamespaceVariables(namespace, 0, b) {
 			if _, ok := result[key]; !ok {
-				result[key] = node.Value
+				result[key] = value
 			}
 		}
 	}
