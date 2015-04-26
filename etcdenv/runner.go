@@ -42,7 +42,7 @@ func (r *Runner) Start(envVariables map[string]string) error {
 	r.cmd.Stderr = os.Stderr
 	r.cmd.Stdin = os.Stdin
 
-	go r.cmd.Run()
+	r.cmd.Start()
 
 	return nil
 }
@@ -71,7 +71,7 @@ func (r *Runner) Wait() error {
 		return newError(ErrNotStarted)
 	}
 
-	_, err := r.cmd.Process.Wait()
+	err := r.cmd.Wait()
 
 	return err
 }

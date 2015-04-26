@@ -4,8 +4,11 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/coreos/go-etcd/etcd"
 	"log"
+	"os"
+	"os/exec"
 	"reflect"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -172,20 +175,29 @@ func (ctx *Context) Run() {
 		}
 
 	} else {
-		processExitChan := make(chan bool)
+		processExitChan := make(chan int)
 
 		time.Sleep(200 * time.Millisecond)
 
 		go func() {
-			ctx.Runner.Wait()
-			processExitChan <- true
+			err := ctx.Runner.Wait()
+			if exiterr, ok := err.(*exec.ExitError); ok {
+				if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+					processExitChan <- status.ExitStatus()
+				} else {
+					processExitChan <- 0
+				}
+			} else {
+				processExitChan <- 0
+			}
 		}()
 
 		select {
 		case <-ctx.ExitChan:
 			ctx.Runner.Stop()
-		case <-processExitChan:
+		case status := <-processExitChan:
 			ctx.ExitChan <- true
+			os.Exit(status)
 		}
 	}
 }
