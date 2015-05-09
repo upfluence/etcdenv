@@ -1,7 +1,8 @@
 #!/bin/sh
 
 export GOPATH=`pwd`/Godeps/_workspace:$GOPATH
-version=$1
+
+version=`grep currentVersion etcdenv.go | head -n 1 | cut -d\" -f2`
 
 git tag v$version
 
