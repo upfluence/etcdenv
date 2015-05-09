@@ -28,11 +28,11 @@ const currentVersion = "0.2.0"
 var (
 	flagset = flag.NewFlagSet("etcdenv", flag.ExitOnError)
 	flags   = struct {
-		Version          bool
-		ShutdownBehavour string
-		Server           string
-		Namespace        string
-		WatchedKeys      string
+		Version           bool
+		ShutdownBehaviour string
+		Server            string
+		Namespace         string
+		WatchedKeys       string
 	}{}
 )
 
@@ -53,8 +53,8 @@ func init() {
 	flagset.BoolVar(&flags.Version, "version", false, "Print the version and exit")
 	flagset.BoolVar(&flags.Version, "v", false, "Print the version and exit")
 
-	flagset.StringVar(&flags.ShutdownBehavour, "b", "keepalive", "Behavour when the process stop [exit|keepalive|restart]")
-	flagset.StringVar(&flags.ShutdownBehavour, "shutdownBehavour", "keepalive", "Behavour when the process stop [exit|keepalive|restart]")
+	flagset.StringVar(&flags.ShutdownBehaviour, "b", "keepalive", "Behaviour when the process stop [exit|keepalive|restart]")
+	flagset.StringVar(&flags.ShutdownBehaviour, "shutdownBehaviour", "keepalive", "Behaviour when the process stop [exit|keepalive|restart]")
 
 	flagset.StringVar(&flags.Server, "server", "http://127.0.0.1:4001", "Location of the etcd server")
 	flagset.StringVar(&flags.Server, "s", "http://127.0.0.1:4001", "Location of the etcd server")
@@ -95,7 +95,7 @@ func main() {
 		strings.Split(flags.Namespace, ","),
 		[]string{flags.Server},
 		flagset.Args(),
-		flags.ShutdownBehavour,
+		flags.ShutdownBehaviour,
 		watchedKeysList,
 	)
 

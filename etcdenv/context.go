@@ -13,34 +13,34 @@ import (
 )
 
 type Context struct {
-	Namespaces       []string
-	Runner           *Runner
-	ExitChan         chan bool
-	ShutdownBehavour string
-	WatchedKeys      []string
-	CurrentEnv       map[string]string
-	maxRetry         int
-	etcdClient       *etcd.Client
+	Namespaces        []string
+	Runner            *Runner
+	ExitChan          chan bool
+	ShutdownBehaviour string
+	WatchedKeys       []string
+	CurrentEnv        map[string]string
+	maxRetry          int
+	etcdClient        *etcd.Client
 }
 
 func NewContext(namespaces []string, endpoints, command []string,
-	shutdownBehavour string, watchedKeys []string) (*Context, error) {
+	shutdownBehaviour string, watchedKeys []string) (*Context, error) {
 
-	if shutdownBehavour != "keepalive" && shutdownBehavour != "restart" &&
-		shutdownBehavour != "exit" {
+	if shutdownBehaviour != "keepalive" && shutdownBehaviour != "restart" &&
+		shutdownBehaviour != "exit" {
 		return nil,
-			errors.New("Choose a correct shutdown behavour : keepalive | exit | restart")
+			errors.New("Choose a correct shutdown behaviour : keepalive | exit | restart")
 	}
 
 	return &Context{
-		Namespaces:       namespaces,
-		Runner:           NewRunner(command),
-		etcdClient:       etcd.NewClient(endpoints),
-		ShutdownBehavour: shutdownBehavour,
-		ExitChan:         make(chan bool),
-		WatchedKeys:      watchedKeys,
-		CurrentEnv:       make(map[string]string),
-		maxRetry:         3,
+		Namespaces:        namespaces,
+		Runner:            NewRunner(command),
+		etcdClient:        etcd.NewClient(endpoints),
+		ShutdownBehaviour: shutdownBehaviour,
+		ExitChan:          make(chan bool),
+		WatchedKeys:       watchedKeys,
+		CurrentEnv:        make(map[string]string),
+		maxRetry:          3,
 	}, nil
 }
 
@@ -184,10 +184,10 @@ func (ctx *Context) Run() {
 		case status := <-processExitChan:
 			log.Println(fmt.Sprintf("Process exited with the status %d", status))
 
-			if ctx.ShutdownBehavour == "exit" {
+			if ctx.ShutdownBehaviour == "exit" {
 				ctx.ExitChan <- true
 				os.Exit(status)
-			} else if ctx.ShutdownBehavour == "restart" {
+			} else if ctx.ShutdownBehaviour == "restart" {
 				log.Println("Process restarted")
 				ctx.CurrentEnv = ctx.fetchEtcdVariables()
 				ctx.Runner.Restart(ctx.CurrentEnv)
