@@ -29,7 +29,7 @@ func NewContext(namespaces []string, endpoints, command []string,
 	if shutdownBehavour != "keepalive" && shutdownBehavour != "restart" &&
 		shutdownBehavour != "exit" {
 		return nil,
-			errors.New("Choose a correct variable for the shutdown behavour")
+			errors.New("Choose a correct shutdown behavour : keepalive | exit | restart")
 	}
 
 	return &Context{
