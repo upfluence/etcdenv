@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"syscall"
+	"time"
 )
 
 type Runner struct {
@@ -74,4 +76,18 @@ func (r *Runner) Wait() error {
 	err := r.cmd.Wait()
 
 	return err
+}
+
+func (r *Runner) WatchProcess(exitStatus chan int) {
+	time.Sleep(200 * time.Millisecond)
+	err := r.Wait()
+	if exiterr, ok := err.(*exec.ExitError); ok {
+		if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+			exitStatus <- status.ExitStatus()
+		} else {
+			exitStatus <- 0
+		}
+	} else {
+		exitStatus <- 0
+	}
 }

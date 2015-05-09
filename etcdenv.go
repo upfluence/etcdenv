@@ -17,6 +17,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/upfluence/etcdenv/etcdenv"
+	"log"
 	"os"
 	"os/signal"
 	"strings"
@@ -27,12 +28,11 @@ const currentVersion = "0.1.3"
 var (
 	flagset = flag.NewFlagSet("etcdenv", flag.ExitOnError)
 	flags   = struct {
-		Version         bool
-		RestartOnChange bool
-
-		Server      string
-		Namespace   string
-		WatchedKeys string
+		Version          bool
+		ShutdownBehavour string
+		Server           string
+		Namespace        string
+		WatchedKeys      string
 	}{}
 )
 
@@ -53,7 +53,8 @@ func init() {
 	flagset.BoolVar(&flags.Version, "version", false, "Print the version and exit")
 	flagset.BoolVar(&flags.Version, "v", false, "Print the version and exit")
 
-	flagset.BoolVar(&flags.RestartOnChange, "r", false, "Not restart the command when a value change")
+	flagset.StringVar(&flags.ShutdownBehavour, "b", "exit", "Behavour when the process stop")
+	flagset.StringVar(&flags.ShutdownBehavour, "shutdownBehavour", "exit", "Behavour when the process stop")
 
 	flagset.StringVar(&flags.Server, "server", "http://127.0.0.1:4001", "Location of the etcd server")
 	flagset.StringVar(&flags.Server, "s", "http://127.0.0.1:4001", "Location of the etcd server")
@@ -90,13 +91,18 @@ func main() {
 		watchedKeysList = strings.Split(flags.WatchedKeys, ",")
 	}
 
-	ctx := etcdenv.NewContext(
+	ctx, err := etcdenv.NewContext(
 		strings.Split(flags.Namespace, ","),
 		[]string{flags.Server},
 		flagset.Args(),
-		!flags.RestartOnChange,
+		flags.ShutdownBehavour,
 		watchedKeysList,
 	)
+
+	if err != nil {
+		log.Fatalf(err.Error())
+		os.Exit(1)
+	}
 
 	go ctx.Run()
 
