@@ -35,8 +35,17 @@ GOPATH=`pwd`/Godeps/_workspace go build -o etcdenv .
 | ------ | ------- | ----------- |
 | `server`, `s` | http://127.0.0.1:4001 | Location of the etcd server |
 | `namespace`, `n`| /environments/production | Etcd directory where the environment variables are fetched. You can watch multiple namespaces by using a comma-separated list (/environments/production,/environments/global) |
-| `r` | false | Not restart the command when a key watch change |
+| `shutdown-behaviour`, `b` | keepalive | Strategy to apply when the process exit, further information into the next paragraph |
 | `watched`, `w` | `""` | A comma-separated list of environment variables triggering the command restart when they change |
+
+
+### Shutdown strategies
+
+* `restart`: `etcdenv` rerun the command when the wrapped process exits
+* `exit`:  The `etcdenv` process exits with the same exit status as the
+  wrapped process's
+* `keepalive`: The `etcdenv` process will stay alive and keep looking
+  for etcd changes to re-run the command
 
 ### Command line
 

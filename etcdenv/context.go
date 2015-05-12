@@ -1,39 +1,47 @@
 package etcdenv
 
 import (
+	"errors"
+	"fmt"
 	"github.com/cenkalti/backoff"
 	"github.com/coreos/go-etcd/etcd"
 	"log"
 	"os"
-	"os/exec"
 	"reflect"
 	"strings"
-	"syscall"
 	"time"
 )
 
 type Context struct {
-	Namespaces      []string
-	Runner          *Runner
-	ExitChan        chan bool
-	RestartOnChange bool
-	WatchedKeys     []string
-	CurrentEnv      map[string]string
-	maxRetry        int
-	etcdClient      *etcd.Client
+	Namespaces        []string
+	Runner            *Runner
+	ExitChan          chan bool
+	ShutdownBehaviour string
+	WatchedKeys       []string
+	CurrentEnv        map[string]string
+	maxRetry          int
+	etcdClient        *etcd.Client
 }
 
-func NewContext(namespaces []string, endpoints, command []string, restart bool, watchedKeys []string) *Context {
-	return &Context{
-		Namespaces:      namespaces,
-		Runner:          NewRunner(command),
-		etcdClient:      etcd.NewClient(endpoints),
-		RestartOnChange: restart,
-		ExitChan:        make(chan bool),
-		WatchedKeys:     watchedKeys,
-		CurrentEnv:      make(map[string]string),
-		maxRetry:        3,
+func NewContext(namespaces []string, endpoints, command []string,
+	shutdownBehaviour string, watchedKeys []string) (*Context, error) {
+
+	if shutdownBehaviour != "keepalive" && shutdownBehaviour != "restart" &&
+		shutdownBehaviour != "exit" {
+		return nil,
+			errors.New("Choose a correct shutdown behaviour : keepalive | exit | restart")
 	}
+
+	return &Context{
+		Namespaces:        namespaces,
+		Runner:            NewRunner(command),
+		etcdClient:        etcd.NewClient(endpoints),
+		ShutdownBehaviour: shutdownBehaviour,
+		ExitChan:          make(chan bool),
+		WatchedKeys:       watchedKeys,
+		CurrentEnv:        make(map[string]string),
+		maxRetry:          3,
+	}, nil
 }
 
 func (ctx *Context) escapeNamespace(key string) string {
@@ -122,82 +130,69 @@ func (ctx *Context) Run() {
 	ctx.CurrentEnv = ctx.fetchEtcdVariables()
 	ctx.Runner.Start(ctx.CurrentEnv)
 
-	if ctx.RestartOnChange {
-		responseChan := make(chan *etcd.Response)
+	responseChan := make(chan *etcd.Response)
+	processExitChan := make(chan int)
 
-		for _, namespace := range ctx.Namespaces {
-			go func() {
-				var t time.Duration
-				b := backoff.NewExponentialBackOff()
-				b.Reset()
-
-				for {
-					resp, err := ctx.etcdClient.Watch(namespace, 0, true, nil, ctx.ExitChan)
-
-					if err != nil {
-						log.Println(err.Error())
-
-						if !reflect.TypeOf(err).ConvertibleTo(etcdErrorType) {
-							continue
-						}
-
-						if err.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
-							t = b.NextBackOff()
-							log.Printf("Can't join the etcd server, wait %v", t)
-							time.Sleep(t)
-						}
-
-						if t == backoff.Stop {
-							return
-						} else {
-							continue
-						}
-					}
-
-					log.Printf("%s key changed", resp.Node.Key)
-
-					if ctx.shouldRestart(ctx.escapeNamespace(resp.Node.Key), resp.Node.Value) {
-						responseChan <- resp
-					}
-				}
-			}()
-		}
-
-		for {
-			select {
-			case <-responseChan:
-				log.Println("Process restarted")
-				ctx.CurrentEnv = ctx.fetchEtcdVariables()
-				ctx.Runner.Restart(ctx.CurrentEnv)
-			case <-ctx.ExitChan:
-				ctx.Runner.Stop()
-			}
-		}
-
-	} else {
-		processExitChan := make(chan int)
-
-		time.Sleep(200 * time.Millisecond)
-
+	for _, namespace := range ctx.Namespaces {
 		go func() {
-			err := ctx.Runner.Wait()
-			if exiterr, ok := err.(*exec.ExitError); ok {
-				if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-					processExitChan <- status.ExitStatus()
-				} else {
-					processExitChan <- 0
+			var t time.Duration
+			b := backoff.NewExponentialBackOff()
+			b.Reset()
+
+			for {
+				resp, err := ctx.etcdClient.Watch(namespace, 0, true, nil, ctx.ExitChan)
+
+				if err != nil {
+					log.Println(err.Error())
+
+					if !reflect.TypeOf(err).ConvertibleTo(etcdErrorType) {
+						continue
+					}
+
+					if err.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
+						t = b.NextBackOff()
+						log.Printf("Can't join the etcd server, wait %v", t)
+						time.Sleep(t)
+					}
+
+					if t == backoff.Stop {
+						return
+					} else {
+						continue
+					}
 				}
-			} else {
-				processExitChan <- 0
+
+				log.Printf("%s key changed", resp.Node.Key)
+
+				if ctx.shouldRestart(ctx.escapeNamespace(resp.Node.Key), resp.Node.Value) {
+					responseChan <- resp
+				}
 			}
 		}()
+	}
 
+	go ctx.Runner.WatchProcess(processExitChan)
+
+	for {
 		select {
+		case <-responseChan:
+			log.Println("Process restarted")
+			ctx.CurrentEnv = ctx.fetchEtcdVariables()
+			ctx.Runner.Restart(ctx.CurrentEnv)
 		case <-ctx.ExitChan:
 			ctx.Runner.Stop()
 		case status := <-processExitChan:
-			ctx.ExitChan <- true
-			os.Exit(status)
+			log.Println(fmt.Sprintf("Process exited with the status %d", status))
+
+			if ctx.ShutdownBehaviour == "exit" {
+				ctx.ExitChan <- true
+				os.Exit(status)
+			} else if ctx.ShutdownBehaviour == "restart" {
+				log.Println("Process restarted")
+				ctx.CurrentEnv = ctx.fetchEtcdVariables()
+				ctx.Runner.Restart(ctx.CurrentEnv)
+				go ctx.Runner.WatchProcess(processExitChan)
+			}
 		}
 	}
 }
