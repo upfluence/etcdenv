@@ -134,7 +134,7 @@ func (ctx *Context) Run() {
 	processExitChan := make(chan int)
 
 	for _, namespace := range ctx.Namespaces {
-		go func() {
+		go func(namespace string) {
 			var t time.Duration
 			b := backoff.NewExponentialBackOff()
 			b.Reset()
@@ -168,7 +168,7 @@ func (ctx *Context) Run() {
 					responseChan <- resp
 				}
 			}
-		}()
+		}(namespace)
 	}
 
 	go ctx.Runner.WatchProcess(processExitChan)
