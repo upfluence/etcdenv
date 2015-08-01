@@ -53,7 +53,7 @@ func init() {
 	flagset.BoolVar(&flags.Version, "version", false, "Print the version and exit")
 	flagset.BoolVar(&flags.Version, "v", false, "Print the version and exit")
 
-	flagset.StringVar(&flags.ShutdownBehaviour, "b", "keepalive", "Behaviour when the process stop [exit|keepalive|restart]")
+	flagset.StringVar(&flags.ShutdownBehaviour, "b", "exit", "Behaviour when the process stop [exit|keepalive|restart]")
 	flagset.StringVar(&flags.ShutdownBehaviour, "shutdown-behaviour", "keepalive", "Behaviour when the process stop [exit|keepalive|restart]")
 
 	flagset.StringVar(&flags.Server, "server", "http://127.0.0.1:4001", "Location of the etcd server")
