@@ -1,8 +1,17 @@
 #!/bin/sh
 
+if [ "$#" -ne 1 ]; then
+  echo "Usage: $0 VERSION" >&2
+  exit 1
+fi
+
 export GOPATH=`pwd`/Godeps/_workspace:$GOPATH
 
-version=`grep currentVersion etcdenv.go | head -n 1 | cut -d\" -f2`
+version=$1
+sed -i "/const currentVersion/c\const currentVersion = \"$version\"" etcdenv.go
+sed -i "/ENV ETCDENV_VERSION/c\ENV ETCDENV_VERSION=$version" Dockerfile
+
+git commit etcdenv.go Dockerfile -m "Release $version"
 
 git tag v$version
 
