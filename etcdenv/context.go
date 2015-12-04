@@ -2,7 +2,6 @@ package etcdenv
 
 import (
 	"errors"
-	"fmt"
 	"github.com/cenkalti/backoff"
 	"github.com/coreos/go-etcd/etcd"
 	"log"
@@ -185,7 +184,7 @@ func (ctx *Context) Run() {
 			ctx.Runner.Stop()
 			log.Println("Runner stopped")
 		case status := <-processExitChan:
-			fmt.Printf("Child process exited with status %d\n", status)
+			log.Printf("Child process exited with status %d\n", status)
 			if ctx.ShutdownBehaviour == "exit" {
 				ctx.ExitChan <- true
 				os.Exit(status)
