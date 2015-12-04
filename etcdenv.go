@@ -24,7 +24,7 @@ import (
 	"syscall"
 )
 
-const currentVersion = "0.3.2"
+const currentVersion = "0.3.1"
 
 var (
 	flagset = flag.NewFlagSet("etcdenv", flag.ExitOnError)
