@@ -2,7 +2,6 @@ package etcdenv
 
 import (
 	"errors"
-	"fmt"
 	"github.com/cenkalti/backoff"
 	"github.com/coreos/go-etcd/etcd"
 	"log"
@@ -176,22 +175,24 @@ func (ctx *Context) Run() {
 	for {
 		select {
 		case <-responseChan:
-			log.Println("Process restarted")
+			log.Println("Environment changed, restarting child process..")
 			ctx.CurrentEnv = ctx.fetchEtcdVariables()
 			ctx.Runner.Restart(ctx.CurrentEnv)
+			log.Println("Process restarted")
 		case <-ctx.ExitChan:
+			log.Println("Asking the runner to stop")
 			ctx.Runner.Stop()
+			log.Println("Runner stopped")
 		case status := <-processExitChan:
-			log.Println(fmt.Sprintf("Process exited with the status %d", status))
-
+			log.Printf("Child process exited with status %d\n", status)
 			if ctx.ShutdownBehaviour == "exit" {
 				ctx.ExitChan <- true
 				os.Exit(status)
 			} else if ctx.ShutdownBehaviour == "restart" {
-				log.Println("Process restarted")
 				ctx.CurrentEnv = ctx.fetchEtcdVariables()
 				ctx.Runner.Restart(ctx.CurrentEnv)
 				go ctx.Runner.WatchProcess(processExitChan)
+				log.Println("Process restarted")
 			}
 		}
 	}

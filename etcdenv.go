@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"syscall"
 )
 
 const currentVersion = "0.3.1"
@@ -78,12 +79,12 @@ func main() {
 	}
 
 	if flags.Version {
-		fmt.Printf("etcdenv v%s", currentVersion)
+		log.Printf("etcdenv v%s", currentVersion)
 		os.Exit(0)
 	}
 
 	signalChan := make(chan os.Signal)
-	signal.Notify(signalChan, os.Interrupt, os.Kill)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
 	if flags.WatchedKeys == "" {
 		watchedKeysList = []string{}
@@ -107,8 +108,10 @@ func main() {
 	go ctx.Run()
 
 	select {
-	case <-signalChan:
+	case sig := <-signalChan:
+		log.Printf("Received signal %s", sig)
 		ctx.ExitChan <- true
 	case <-ctx.ExitChan:
+		log.Printf("Catching ExitChan, doing nothin'")
 	}
 }
