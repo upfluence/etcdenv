@@ -9,8 +9,9 @@ import (
 )
 
 type Runner struct {
-	Command    []string
-	DefaultEnv []string
+	Command      []string
+	DefaultEnv   []string
+	IsRestarting bool
 
 	cmd *exec.Cmd
 }
@@ -63,6 +64,9 @@ func (r *Runner) Stop() error {
 }
 
 func (r *Runner) Restart(envVariables map[string]string) error {
+	r.IsRestarting = true
+	defer func() { r.IsRestarting = false }()
+
 	r.Stop()
 
 	return r.Start(envVariables)
@@ -79,15 +83,21 @@ func (r *Runner) Wait() error {
 }
 
 func (r *Runner) WatchProcess(exitStatus chan int) {
-	time.Sleep(200 * time.Millisecond)
-	err := r.Wait()
-	if exiterr, ok := err.(*exec.ExitError); ok {
-		if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-			exitStatus <- status.ExitStatus()
-		} else {
-			exitStatus <- 0
+	for {
+		time.Sleep(200 * time.Millisecond)
+		err := r.Wait()
+
+		if !r.IsRestarting {
+			if exiterr, ok := err.(*exec.ExitError); ok {
+				if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+					exitStatus <- status.ExitStatus()
+				} else {
+					exitStatus <- 0
+				}
+			} else {
+				exitStatus <- 0
+			}
+			break
 		}
-	} else {
-		exitStatus <- 0
 	}
 }
