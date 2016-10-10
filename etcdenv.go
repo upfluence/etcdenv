@@ -16,15 +16,16 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/upfluence/etcdenv/etcdenv"
-	"log"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
+
+	"github.com/upfluence/etcdenv/etcdenv"
+	"github.com/upfluence/goutils/log"
 )
 
-const currentVersion = "0.3.3"
+const currentVersion = "0.4.0"
 
 var (
 	flagset = flag.NewFlagSet("etcdenv", flag.ExitOnError)
@@ -79,7 +80,7 @@ func main() {
 	}
 
 	if flags.Version {
-		log.Printf("etcdenv v%s", currentVersion)
+		fmt.Printf("etcdenv v%s", currentVersion)
 		os.Exit(0)
 	}
 
@@ -109,9 +110,9 @@ func main() {
 
 	select {
 	case sig := <-signalChan:
-		log.Printf("Received signal %s", sig)
+		log.Noticef("Received signal %s", sig)
 		ctx.ExitChan <- true
 	case <-ctx.ExitChan:
-		log.Printf("Catching ExitChan, doing nothin'")
+		log.Infof("Catching ExitChan, doing nothin'")
 	}
 }

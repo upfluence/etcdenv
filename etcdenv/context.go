@@ -2,13 +2,13 @@ package etcdenv
 
 import (
 	"errors"
-	"github.com/cenkalti/backoff"
-	"github.com/coreos/go-etcd/etcd"
-	"log"
 	"os"
-	"reflect"
 	"strings"
 	"time"
+
+	"github.com/cenkalti/backoff"
+	"github.com/coreos/go-etcd/etcd"
+	"github.com/upfluence/goutils/log"
 )
 
 type Context struct {
@@ -28,7 +28,9 @@ func NewContext(namespaces []string, endpoints, command []string,
 	if shutdownBehaviour != "keepalive" && shutdownBehaviour != "restart" &&
 		shutdownBehaviour != "exit" {
 		return nil,
-			errors.New("Choose a correct shutdown behaviour : keepalive | exit | restart")
+			errors.New(
+				"Choose a correct shutdown behaviour : keepalive | exit | restart",
+			)
 	}
 
 	return &Context{
@@ -60,21 +62,16 @@ func (ctx *Context) fetchEtcdNamespaceVariables(namespace string, currentRetry i
 	response, err := ctx.etcdClient.Get(namespace, false, false)
 
 	if err != nil {
-		etcdErrorType := reflect.TypeOf(&etcd.EtcdError{})
-		log.Println(err.Error())
+		log.Errorf("etcd fetching error: %s", err.Error())
 
-		if !reflect.TypeOf(err).ConvertibleTo(etcdErrorType) {
-			panic(err.Error())
-		}
-
-		if err.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
-			log.Println("Can't join the etcd server, fallback to the env variables")
-		} else if err.(*etcd.EtcdError).ErrorCode == ErrKeyNotFound {
-			log.Println("The namespace does not exist, fallback to the env variables")
+		if e, ok := err.(*etcd.EtcdError); ok && e.ErrorCode == etcd.ErrCodeEtcdNotReachable {
+			log.Error("Can't join the etcd server, fallback to the env variables")
+		} else if e, ok := err.(*etcd.EtcdError); ok && e.ErrorCode == ErrKeyNotFound {
+			log.Error("The namespace does not exist, fallback to the env variables")
 		}
 
 		if currentRetry < ctx.maxRetry {
-			log.Println("retry fetching variables")
+			log.Info("retry fetching variables")
 			t := b.NextBackOff()
 			time.Sleep(t)
 			return ctx.fetchEtcdNamespaceVariables(namespace, currentRetry+1, b)
@@ -125,7 +122,6 @@ func (ctx *Context) shouldRestart(envVar, value string) bool {
 }
 
 func (ctx *Context) Run() {
-	etcdErrorType := reflect.TypeOf(&etcd.EtcdError{})
 	ctx.CurrentEnv = ctx.fetchEtcdVariables()
 	ctx.Runner.Start(ctx.CurrentEnv)
 
@@ -142,15 +138,11 @@ func (ctx *Context) Run() {
 				resp, err := ctx.etcdClient.Watch(namespace, 0, true, nil, ctx.ExitChan)
 
 				if err != nil {
-					log.Println(err.Error())
+					log.Errorf("etcd fetching error: %s", err.Error())
 
-					if !reflect.TypeOf(err).ConvertibleTo(etcdErrorType) {
-						continue
-					}
-
-					if err.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
+					if e, ok := err.(*etcd.EtcdError); ok && e.ErrorCode == etcd.ErrCodeEtcdNotReachable {
 						t = b.NextBackOff()
-						log.Printf("Can't join the etcd server, wait %v", t)
+						log.Noticef("Can't join the etcd server, wait %v", t)
 						time.Sleep(t)
 					}
 
@@ -161,7 +153,7 @@ func (ctx *Context) Run() {
 					}
 				}
 
-				log.Printf("%s key changed", resp.Node.Key)
+				log.Infof("%s key changed", resp.Node.Key)
 
 				if ctx.shouldRestart(ctx.escapeNamespace(resp.Node.Key), resp.Node.Value) {
 					responseChan <- resp
@@ -175,16 +167,16 @@ func (ctx *Context) Run() {
 	for {
 		select {
 		case <-responseChan:
-			log.Println("Environment changed, restarting child process..")
+			log.Notice("Environment changed, restarting child process..")
 			ctx.CurrentEnv = ctx.fetchEtcdVariables()
 			ctx.Runner.Restart(ctx.CurrentEnv)
-			log.Println("Process restarted")
+			log.Notice("Process restarted")
 		case <-ctx.ExitChan:
-			log.Println("Asking the runner to stop")
+			log.Notice("Asking the runner to stop")
 			ctx.Runner.Stop()
-			log.Println("Runner stopped")
+			log.Notice("Runner stopped")
 		case status := <-processExitChan:
-			log.Printf("Child process exited with status %d\n", status)
+			log.Noticef("Child process exited with status %d", status)
 			if ctx.ShutdownBehaviour == "exit" {
 				ctx.ExitChan <- true
 				os.Exit(status)
@@ -192,7 +184,7 @@ func (ctx *Context) Run() {
 				ctx.CurrentEnv = ctx.fetchEtcdVariables()
 				ctx.Runner.Restart(ctx.CurrentEnv)
 				go ctx.Runner.WatchProcess(processExitChan)
-				log.Println("Process restarted")
+				log.Notice("Process restarted")
 			}
 		}
 	}
