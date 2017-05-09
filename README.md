@@ -1,5 +1,7 @@
 # etcdenv
 
+[![Join the chat at https://gitter.im/upfluence/etcdenv](https://badges.gitter.im/upfluence/etcdenv.svg)](https://gitter.im/upfluence/etcdenv?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 Etcdenv provide a convenient way to populate environments variables from one your etcd directory
 
 ## Installation
