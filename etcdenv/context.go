@@ -174,11 +174,13 @@ func (ctx *Context) Run() {
 		case <-ctx.ExitChan:
 			log.Notice("Asking the runner to stop")
 			ctx.Runner.Stop()
+			os.Stderr.Sync()
 			log.Notice("Runner stopped")
 		case status := <-processExitChan:
 			log.Noticef("Child process exited with status %d", status)
 			if ctx.ShutdownBehaviour == "exit" {
 				ctx.ExitChan <- true
+				os.Stderr.Sync()
 				os.Exit(status)
 			} else if ctx.ShutdownBehaviour == "restart" {
 				ctx.CurrentEnv = ctx.fetchEtcdVariables()
