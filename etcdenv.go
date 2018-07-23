@@ -25,7 +25,7 @@ import (
 	"github.com/upfluence/goutils/log"
 )
 
-const currentVersion = "0.4.0"
+const currentVersion = "0.4.1"
 
 var (
 	flagset = flag.NewFlagSet("etcdenv", flag.ExitOnError)
