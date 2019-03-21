@@ -23,7 +23,7 @@ type Context struct {
 }
 
 func NewContext(namespaces []string, endpoints, command []string,
-	shutdownBehaviour string, watchedKeys []string) (*Context, error) {
+	shutdownBehaviour string, watchedKeys []string, username string, password string) (*Context, error) {
 
 	if shutdownBehaviour != "keepalive" && shutdownBehaviour != "restart" &&
 		shutdownBehaviour != "exit" {
@@ -33,10 +33,16 @@ func NewContext(namespaces []string, endpoints, command []string,
 			)
 	}
 
+        etcdClient := etcd.NewClient(endpoints)
+
+        if username != "" && password != "" {
+                etcdClient.SetCredentials(username, password)
+        }
+
 	return &Context{
 		Namespaces:        namespaces,
 		Runner:            NewRunner(command),
-		etcdClient:        etcd.NewClient(endpoints),
+		etcdClient:        etcdClient,
 		ShutdownBehaviour: shutdownBehaviour,
 		ExitChan:          make(chan bool),
 		WatchedKeys:       watchedKeys,
