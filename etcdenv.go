@@ -35,6 +35,8 @@ var (
 		Server            string
 		Namespace         string
 		WatchedKeys       string
+		UserName          string
+		Password          string
 	}{}
 )
 
@@ -66,6 +68,12 @@ func init() {
 
 	flagset.StringVar(&flags.WatchedKeys, "watched", "", "environment variables to watch, comma-separated")
 	flagset.StringVar(&flags.WatchedKeys, "w", "", "environment variables to watch, comma-separated")
+
+	flagset.StringVar(&flags.UserName, "user", "", "user to authenticate to etcd server")
+	flagset.StringVar(&flags.UserName, "u", "", "user to authenticate to etcd server")
+
+	flagset.StringVar(&flags.Password, "password", "", "password to authenticate to etcd server")
+	flagset.StringVar(&flags.Password, "p", "", "password to authenticate to etcd server")
 }
 
 func main() {
@@ -99,6 +107,8 @@ func main() {
 		flagset.Args(),
 		flags.ShutdownBehaviour,
 		watchedKeysList,
+		flags.UserName,
+		flags.Password,
 	)
 
 	if err != nil {
